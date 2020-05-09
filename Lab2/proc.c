@@ -250,6 +250,9 @@ exit(void)
   end_op();
   curproc->cwd = 0;
 
+  end_time = ticks;
+  cprintf("\n turnaround time is %d\n", end_time - curproc->start_time);
+
   acquire(&ptable.lock);
 
   // Parent might be sleeping in wait().
@@ -263,9 +266,6 @@ exit(void)
         wakeup1(initproc);
     }
   }
-
-  end_time = ticks;
-  cprintf("\n turnaround time is %d\n", end_time - curproc->start_time);
 
   // Jump into the scheduler, never to return.
   curproc->state = ZOMBIE;
@@ -351,23 +351,32 @@ void
 scheduler(void)
 {
   struct proc *p;
-  struct proc *next;
   struct cpu *c = mycpu();
   c->proc = 0;
+  int low_priority;
   
   for(;;){
     // Enable interrupts on this processor.
     sti();
 
     // Loop over process table looking for process to run.
+    low_priority = 1000;
     acquire(&ptable.lock);
-    for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+      for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+          if (p->state == RUNNABLE && p->priority < low_priority) {
+              low_priority = p->priority;
+          }
+      }
+
+      for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
       if(p->state != RUNNABLE)
         continue;
 
-      for(next = p + 1; next < &ptable.proc[NPROC]; next++){
-          if(next->state == RUNNABLE && next->priority < p->priority)
-              p = next;
+      if(p->priority != low_priority){
+          if (p->priority > 0) {
+              p->priority--;
+          }
+          continue;
       }
 
       // Switch to chosen process.  It is the process's job
@@ -376,6 +385,7 @@ scheduler(void)
       c->proc = p;
       switchuvm(p);
       p->state = RUNNING;
+      p->priority++;
 
       swtch(&(c->scheduler), p->context);
       switchkvm();
@@ -383,22 +393,9 @@ scheduler(void)
       // Process is done running for now.
       // It should have changed its p->state before coming back.
       c->proc = 0;
-
-      for(next = ptable.proc; next < &ptable.proc[NPROC]; next++){
-          if(next->state == RUNNABLE){
-              if(next == p && next->priority < 31){
-                  next->priority = next->priority + 1;
-              }
-              else if(next != p && next->priority > 0){
-                  next->priority = next->priority - 1;
-              }
-          }
-      }
-
-      p = ptable.proc;
     }
-    release(&ptable.lock);
 
+    release(&ptable.lock);
   }
 }
 
