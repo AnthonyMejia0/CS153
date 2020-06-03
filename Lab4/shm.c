@@ -37,7 +37,7 @@ int shm_open(int id, char **pointer) {
   int j = 64;
   int k = 0;
   acquire(&(shm_table.lock));
-  for (i = 0; i< 64; i++) {
+  for (i = 0; i < 64; i++) {
 	if (j == 64 && shm_table.shm_pages[i].id == 0) {
 	  j = i;
 	}
@@ -69,7 +69,7 @@ int shm_close(int id) {
   //you write this too!
   int i;
   acquire(&(shm_table.lock));
-  for (i = 0; i< 64; i++) {
+  for (i = 0; i < 64; i++) {
     if (shm_table.shm_pages[i].id == id) {
 	  if (shm_table.shm_pages[i].refcnt > 0) {
 	    shm_table.shm_pages[i].refcnt--;
